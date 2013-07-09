@@ -21,7 +21,9 @@ References:
    - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
 */
 
+
 var fs = require('fs');
+var rest = require('restler');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
@@ -54,6 +56,22 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     }
     return out;
 };
+var checkRestUrl = function(url, checksfile) {
+    rest.get(url).on('complete', function(data) {
+            var buf =new Buffer(5000, 'utf8');
+            var l=buf.write(data, 0, "utf8");
+            $ = cheerio.load(buf.toString('utf8', 0, l));
+            var checks = loadChecks(checksfile).sort();
+
+            var out = {};
+            for(var ii in checks) {
+                var present = $(checks[ii]).length > 0;
+                out[checks[ii]] = present;
+            }
+            var outJson = JSON.stringify(out);
+            console.log(outJson);
+        });
+}
 
 var clone = function(fn) {
     // Workaround for commander.js issue.
@@ -65,10 +83,15 @@ if(require.main == module) {
     program
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
+        .option('-u, --url <url>', 'Url to check')
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    if (program.url) {
+        var checkUrl = checkRestUrl(program.url, program.checks);
+    }
+    else {
+        var checkJson = checkHtmlFile(program.file, program.checks);
+        var outJson = JSON.stringify(checkJson, null, 4);
+    }
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
